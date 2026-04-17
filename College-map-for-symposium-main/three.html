@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Floor 3 — Registration → Event Navigation</title>
+    <style>
+        :root {
+            --bg: #eef4fb;
+            --panel: #ffffff;
+            --accent: #0b66d6;
+            --muted: #516273;
+            --path: #ff5252;
+        }
+
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            font-family: Inter, Arial, Roboto, sans-serif;
+            background: var(--bg)
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background: var(--panel);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+            position: sticky;
+            top: 0;
+            z-index: 20
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 16px
+        }
+
+        #controls {
+            margin-left: auto;
+            display: flex;
+            gap: 8px;
+            align-items: center
+        }
+
+        #app {
+            display: flex;
+            gap: 12px;
+            padding: 12px;
+            min-height: calc(100vh - 64px)
+        }
+
+        #left {
+            flex: 1
+        }
+
+        #map-wrap {
+            background: var(--panel);
+            padding: 12px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            overflow: hidden;
+        }
+
+        .muted {
+            color: var(--muted);
+            font-size: 13px
+        }
+
+        svg {
+            width: 100%;
+            height: 85vh;
+            touch-action: none;
+            display: block;
+            cursor: grab;
+        }
+
+        .room {
+            fill: #dff4ff;
+            stroke: #1a4e7a;
+            stroke-width: 1.5;
+            cursor: pointer
+        }
+
+        .room.highlight {
+            stroke: #ff6b6b;
+            stroke-width: 3;
+            fill: #fff6f6
+        }
+
+        .corridor-line {
+            stroke: #bcd7ee;
+            stroke-width: 22;
+            fill: none;
+            stroke-linecap: round
+        }
+
+        #route {
+            fill: none;
+            stroke: var(--path);
+            stroke-width: 12;
+            stroke-linecap: round;
+            stroke-linejoin: round
+        }
+
+        #routeOverlay {
+            fill: none;
+            stroke: transparent;
+            stroke-width: 12
+        }
+
+        button,
+        input,
+        select {
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid #d6dae0;
+            background: #fff;
+            font-size: 14px
+        }
+
+        button.primary {
+            background: var(--accent);
+            color: #fff;
+            border: none
+        }
+
+        /* MODIFIED: Added styles for zoom buttons */
+        #controls button#zoomInBtn,
+        #controls button#zoomOutBtn {
+            width: 40px;
+            flex-shrink: 0;
+            font-weight: bold;
+        }
+
+        #controls #backBtn {
+            width: auto;
+            flex-shrink: 1;
+        }
+
+        /* --- START: NEW LEGEND STYLES --- */
+    #legend {
+      background: var(--panel);
+      padding: 8px 12px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      margin-bottom: 12px;
+    }
+
+    #legend ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-wrap: wrap; /* Allows wrapping on small screens */
+      gap: 16px;
+    }
+
+    #legend li {
+      display: flex;
+      align-items: center;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .legend-swatch {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      margin-right: 8px;
+      border: 1.5px solid #000;
+    }
+
+    /* Swatch Colors based on your request */
+    #swatch-girls {
+      background-color: #ffefef; /* Pink fill */
+      border-color: #e04ae0; /* Pink stroke */
+    }
+    
+    #swatch-boys {
+      background-color: #e8f6ff; /* Blue fill */
+      border-color: #04139a; /* Blue stroke */
+    }
+
+    #swatch-venue {
+      background-color: #fff6f6; /* Red highlight fill */
+      border-color: #ff6b6b; /* Red highlight stroke */
+    }
+    /* --- END: NEW LEGEND STYLES --- */
+
+        @media (max-width: 650px) {
+            svg {
+                height: auto;
+            }
+
+            header {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            #controls {
+                margin-left: 0;
+                flex-wrap: wrap;
+            }
+
+            #app {
+                padding: 8px;
+                gap: 8px;
+            }
+
+            #map-wrap {
+                padding: 8px;
+            }
+
+            #controls button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Floor 3</h1>
+        <div id="controls">
+            <button id="backBtn" title="Go back">Back to Events</button>
+        </div>
+    </header>
+
+    <div id="legend">
+        <ul>
+          <li><span class="legend-swatch" id="swatch-girls"></span> Girls Restroom</li>
+          <li><span class="legend-swatch" id="swatch-boys"></span> Boys Restroom</li>
+          <li><span class="legend-swatch" id="swatch-venue"></span> Event Venue</li>
+        </ul>
+      </div>
+
+    <div id="app">
+        <div id="left">
+            <div id="map-wrap" class="panel" aria-label="Map area">
+                <svg id="svg" viewBox="0 0 1000 1200" role="img" aria-label="Floor 3 map">
+                    <g id="viewport">
+                        <polyline class="corridor-line" points="140,140 860,140 860,840 140,840 140,140" />
+                        <rect x="280" y="260" width="440" height="420" fill="#fbfdff" stroke="#eef3fb" />
+                        <text x="500" y="470" font-size="40" text-anchor="middle" fill="#6b6b6b">Floor 3</text>
+                        <rect id="STAFF" class="room" x="180" y="50" width="160" height="70" /><text x="260" y="90"
+                            font-size="12" text-anchor="middle">STAFF</text>
+                        <rect id="DH1" class="room" x="360" y="50" width="160" height="70" /><text x="440" y="90"
+                            font-size="12" text-anchor="middle">D HALL 1</text>
+                        <rect id="DH2" class="room" x="540" y="50" width="160" height="70" /><text x="620" y="90"
+                            font-size="12" text-anchor="middle">EDC lab</text>
+                        <rect id="LAB" class="room" x="720" y="50" width="140" height="70" /><text x="790" y="90"
+                            font-size="12" text-anchor="middle">LAB</text>
+                        <rect id="stair-NW" x="50" y="40" width="50" height="80" fill="#e8f2ff" stroke="#7aa6ff" />
+                        <text x="70" y="90" font-size="10" text-anchor="middle">Stair</text>
+                        <rect class="room" x="80" y="175" width="40" height="40" />
+                        <text x="100" y="195" font-size="11" text-anchor="middle">water</text>
+                        <rect id="stair-NE" x="890" y="40" width="50" height="80" fill="#e8f2ff" stroke="#7aa6ff" />
+                        <text x="910" y="90" font-size="10" text-anchor="middle">Stair</text>
+                        <rect class="room" x="880" y="200" width="40" height="40" />
+                        <text x="900" y="220" font-size="11" text-anchor="middle">water</text>
+                        <rect id="stair-SW" x="-10" y="850" width="50" height="80" fill="#e8f2ff" stroke="#7aa6ff" />
+                        <text x="15" y="890" font-size="10" text-anchor="middle">Stair</text>
+                        <rect class="room" x="80" y="775" width="40" height="40" />
+                        <text x="100" y="800" font-size="11" text-anchor="middle">water</text>
+                        <rect class="room" x="20" y="775" width="50" height="40" />
+                        <text x="40" y="800" font-size="11" text-anchor="middle">Lift</text>
+                        <rect id="stair-SE" x="900" y="850" width="50" height="80" fill="#e8f2ff" stroke="#7aa6ff" />
+                        <text x="925" y="890" font-size="10" text-anchor="middle">Stair</text>
+                        <rect class="room" x="880" y="765" width="40" height="40" />
+                        <text x="900" y="790" font-size="11" text-anchor="middle">water</text>
+                        <rect id="REST_TOP" class="room" x="950" y="60" width="80" height="60"
+                            style="fill:#ffefef;stroke:#04139a" />
+                        <text id=B2 x="990" y="90" font-size="11" text-anchor="middle">Boys Restroom</text>
+                        <rect id="LH29" class="room" x="40" y="245" width="80" height="90" /><text x="80" y="290"
+                            font-size="12" text-anchor="middle">LH-29</text>
+                        <rect id="LH30" class="room" x="40" y="345" width="80" height="90" /><text x="80" y="390"
+                            font-size="12" text-anchor="middle">LH-30</text>
+                        <rect id="R1" class="room" x="40" y="445" width="80" height="90" /><text x="80" y="490"
+                            font-size="12" text-anchor="middle">R1</text>
+                        <rect id="R2" class="room" x="40" y="545" width="80" height="90" /><text x="80" y="590"
+                            font-size="12" text-anchor="middle">R2</text>
+                        <rect id="LH31" class="room" x="40" y="645" width="80" height="90" /><text x="80" y="690"
+                            font-size="12" text-anchor="middle">LH-31</text>
+                        <rect id="LH22" class="room" x="880" y="245" width="80" height="90" />
+                        <text x="920" y="280" font-size="11" text-anchor="middle">
+                            <tspan x="920" dy="" font-size="10">LH-22</tspan>
+                            <tspan x="920" dy="12" font-size="10">Paper Presentation</tspan>
+                            <tspan x="920" dy="12" font-size="10">Lyrics Coding</tspan>
+                            <tspan x="920" dy="12" font-size="10">Act it Out</tspan>
+                        </text>
+                        <rect id="LH23" class="room" x="880" y="345" width="80" height="90" />
+                        <text x="900" y="400" font-size="11" text-anchor="middle">
+                            <tspan x="920" dy="-6">LH-23</tspan>
+                            <tspan x="920" dy="12" font-size="10">Technical Quiz</tspan>
+                        </text>
+                        <rect id="LH24" class="room" x="880" y="445" width="80" height="90" />
+                        <text x="900" y="500" font-size="11" text-anchor="middle">LH-24</text>
+                        <rect id="LH25" class="room" x="880" y="545" width="80" height="90" />
+                        <text x="900" y="600" font-size="11" text-anchor="middle">LH-25</text>
+                        <rect id="LH26" class="room" x="880" y="645" width="80" height="90" />
+                        <text x="900" y="700" font-size="11" text-anchor="middle">LH-26</text>
+                        <rect id="DH_BOTTOM" class="room" x="80" y="860" width="180" height="70" /><text x="180" y="895"
+                            font-size="12" text-anchor="middle">D Hall</text>
+                        <rect id="MAUD" class="room" x="270" y="860" width="350" height="70" /><text x="450" y="895"
+                            font-size="12" text-anchor="middle">MAIN AUDITORIUM</text>
+                        <rect id="LH34" class="room" x="630" y="860" width="120" height="70" /><text x="690" y="895"
+                            font-size="12" text-anchor="middle">LH-28</text>
+                        <rect id="LH35" class="room" x="760" y="860" width="120" height="70" /><text x="820" y="895"
+                            font-size="12" text-anchor="middle">LH-27</text>
+                        <polyline id="route" points="" />
+                        <polyline id="routeOverlay" points="" />
+                    </g>
+                </svg>
+            </div>
+            <div>
+                <button id="zoomInBtn" title="Zoom In">+ Zoom in</button>
+                <button id="zoomOutBtn" title="Zoom Out">-Zoom in</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* ... (Map data: REG, nodes, graph, POI_NODE, venueMap) ... */
+        const REG = { x: 500, y: 1015 };
+        const nodes = {
+            N_W: { x: 140, y: 140 }, N1: { x: 280, y: 140 }, N2: { x: 500, y: 140 }, N3: { x: 720, y: 140 }, N_E: { x: 860, y: 140 },
+            E1: { x: 860, y: 260 }, E2: { x: 860, y: 360 }, E3: { x: 860, y: 460 }, E4: { x: 860, y: 560 }, E5: { x: 860, y: 660 },
+            S_E: { x: 860, y: 840 }, S2: { x: 690, y: 840 }, S_MID: { x: 500, y: 840 }, S1: { x: 310, y: 840 }, S_W: { x: 140, y: 840 },
+            W_S: { x: 140, y: 660 }, W1: { x: 140, y: 460 }, W2: { x: 140, y: 260 }
+        };
+        const graph = {
+            'REG': ['S_MID'], 'N_W': ['N1', 'W2'], 'N1': ['N_W', 'N2'], 'N2': ['N1', 'N3'], 'N3': ['N2', 'N_E'], 'N_E': ['N3', 'E1'],
+            'E1': ['N_E', 'E2'], 'E2': ['E1', 'E3'], 'E3': ['E2', 'E4'], 'E4': ['E3', 'E5'], 'E5': ['E4', 'S_E'],
+            'S_E': ['E5', 'S2'], 'S2': ['S_E', 'S_MID'], 'S_MID': ['S2', 'S1', 'REG'], 'S1': ['S_MID', 'S_W'],
+            'S_W': ['S1', 'W_S'], 'W_S': ['S_W', 'W1'], 'W1': ['W_S', 'W2'], 'W2': ['W1', 'N_W']
+        };
+        const POI_NODE = {
+            'STAFF': 'N1', 'DH1': 'N2', 'DH2': 'N3', 'LAB': 'N_E',
+            'LH29': 'W2', 'LH30': 'W1', 'R1': 'W1', 'R2': 'W_S', 'LH31': 'W_S',
+            'LH22': 'E1', 'LH23': 'E2', 'LH24': 'E3', 'LH25': 'E4', 'LH26': 'E5',
+            'DH_BOTTOM': 'S_W', 'MAUD': 'S1', 'LH34': 'S2', 'LH35': 'S_E'
+        };
+        const venueMap = {
+            'LH-28': 'LH34', 'LH-27': 'LH35', 'MAIN AUDITORIUM': 'MAUD',
+            'LH22': 'LH22', 'LH23': 'LH23', 'DH1': 'DH1', 'MECH LH1': 'LH31'
+        };
+
+        const route = document.getElementById('route');
+        const routeOverlay = document.getElementById('routeOverlay');
+        const backBtn = document.getElementById('backBtn');
+
+        // FIXED: Moved refs for zoom buttons
+        const zoomInBtn = document.getElementById('zoomInBtn');
+        const zoomOutBtn = document.getElementById('zoomOutBtn');
+
+        // --- START: MODIFIED ZOOM/PAN CODE ---
+        const svg = document.getElementById('svg');
+        const viewport = document.getElementById('viewport');
+
+        let state = { tx: 0, ty: 0, scale: 1, dragging: false, lastX: 0, lastY: 0 };
+        function applyTransform() {
+            viewport.setAttribute('transform', `translate(${state.tx} ${state.ty}) scale(${state.scale})`);
+        }
+        applyTransform();
+
+        function zoom(delta) {
+            state.scale = Math.min(3, Math.max(0.4, state.scale * delta));
+            applyTransform();
+        }
+
+        svg.addEventListener('pointerdown', (e) => {
+            svg.setPointerCapture(e.pointerId);
+            state.dragging = true;
+            state.lastX = e.clientX;
+            state.lastY = e.clientY;
+            svg.style.cursor = 'grabbing';
+        });
+        svg.addEventListener('pointermove', (e) => {
+            if (!state.dragging) return;
+            const dx = e.clientX - state.lastX, dy = e.clientY - state.lastY;
+            state.lastX = e.clientX; state.lastY = e.clientY;
+            state.tx += dx;
+            state.ty += dy;
+            applyTransform();
+        });
+        svg.addEventListener('pointerup', (e) => {
+            state.dragging = false;
+            try { svg.releasePointerCapture(e.pointerId); } catch (e) { }
+            svg.style.cursor = 'grab';
+        });
+        svg.addEventListener('pointerleave', () => {
+            state.dragging = false;
+            svg.style.cursor = 'grab';
+        });
+        svg.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = -e.deltaY * 0.0015;
+            zoom(1 + delta);
+        }, { passive: false });
+
+        // MODIFIED: Added button click listeners
+        zoomInBtn.addEventListener('click', () => zoom(1.2));
+        zoomOutBtn.addEventListener('click', () => zoom(1 / 1.2));
+        // --- END: MODIFIED ZOOM/PAN CODE ---
+
+        /* ... (Helper functions: nodePos, findPath, pathToPoints) ... */
+        function nodePos(k) { return (k === 'REG') ? REG : nodes[k]; }
+        function findPath(start, end) {
+            if (start === end) return [start];
+            const q = [start], prev = { [start]: null };
+            while (q.length) {
+                const cur = q.shift();
+                const neighbors = graph[cur] || [];
+                for (const nb of neighbors) {
+                    if (prev[nb] !== undefined) continue;
+                    prev[nb] = cur; q.push(nb);
+                    if (nb === end) {
+                        const out = [nb]; let p = cur;
+                        while (p !== null) { out.unshift(p); p = prev[p]; }
+                        return out;
+                    }
+                }
+            }
+            return null;
+        }
+        function pathToPoints(seq) { return seq.map(k => { const p = (k === 'REG') ? REG : nodes[k]; return `${p.x} ${p.y}`; }).join(' '); }
+
+        /* ... (setRouteTo function) ... */
+        function setRouteTo(destKey, drawLine = false) {
+            route.setAttribute('points', '');
+            document.querySelectorAll('.room.highlight').forEach(el => el.classList.remove('highlight'));
+            if (!POI_NODE[destKey]) {
+                console.warn('Unknown destination key:', destKey);
+                return false;
+            }
+            const nodeKey = POI_NODE[destKey];
+            const startNode = drawLine ? 'S_W' : 'REG';
+            const seq = findPath(startNode, nodeKey);
+            if (!seq) {
+                console.warn('No path found from', startNode, 'to', nodeKey);
+                return false;
+            }
+            if (drawLine) {
+                const pts = pathToPoints(seq);
+                route.setAttribute('points', pts);
+                routeOverlay.setAttribute('points', pts);
+            }
+            const destEl = document.getElementById(destKey);
+            if (destEl) {
+                destEl.classList.add('highlight');
+            }
+            return true;
+        }
+
+        /* clickable rooms */
+        document.querySelectorAll('.room').forEach(el => {
+            el.addEventListener('click', () => {
+                const id = el.id;
+                if (POI_NODE[id]) {
+                    setRouteTo(id, false);
+                }
+            });
+        });
+
+        backBtn.addEventListener('click', () => {
+            window.location.href = 'index.html';
+        });
+
+        /* ... (initializeMap function) ... */
+        function initializeMap() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const venue = urlParams.get('venue');
+            const drawPath = urlParams.get('drawPath');
+            if (!venue) return;
+            let destKey = venue.trim().toUpperCase();
+            if (venueMap[destKey]) {
+                destKey = venueMap[destKey];
+            }
+            if (POI_NODE[destKey]) {
+                setRouteTo(destKey, drawPath === 'true');
+            } else {
+                console.warn('Could not find POI for venue:', venue);
+            }
+        }
+
+        initializeMap();
+
+    </script>
+</body>
+
+</html>

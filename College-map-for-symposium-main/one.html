@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Floor 1</title>
+    <style>
+        :root {
+            --bg: #eef4fb;
+            --card: #fff;
+            --accent: #0b66d6;
+            --muted: #516273;
+            --path: #ff5252;
+        }
+
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            font-family: Inter, Arial, Roboto, sans-serif;
+            background: var(--bg)
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background: var(--card);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+            position: sticky;
+            top: 0;
+            z-index: 20
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 16px
+        }
+
+        #controls {
+            margin-left: auto;
+            display: flex;
+            gap: 8px;
+            align-items: center
+        }
+
+        #app {
+            display: flex;
+            gap: 12px;
+            padding: 12px;
+            min-height: calc(100vh - 64px)
+        }
+
+        #left {
+            flex: 1
+        }
+
+        #map-wrap {
+            background: var(--card);
+            padding: 12px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            /* ADDED for zoom */
+            overflow: hidden;
+        }
+
+        .muted {
+            color: var(--muted);
+            font-size: 13px
+        }
+
+        svg {
+            width: 100%;
+            height: 85vh;
+            /* Adjusted height */
+            touch-action: none;
+            display: block;
+            /* ADDED for zoom */
+            cursor: grab;
+        }
+
+        .room {
+            fill: #e8f6ff;
+            stroke: #154b78;
+            stroke-width: 1.5;
+            cursor: pointer
+        }
+
+        .room.highlight {
+            stroke: #ff6b6b;
+            stroke-width: 3;
+            fill: #fff6f6
+        }
+
+        .corridor-line {
+            stroke: #cfe6fb;
+            stroke-width: 26;
+            fill: none;
+            stroke-linecap: round
+        }
+
+        #route {
+            fill: none;
+            stroke: var(--path);
+            stroke-width: 12;
+            stroke-linecap: round;
+            stroke-linejoin: round
+        }
+
+        #routeOverlay {
+            fill: none;
+            stroke: transparent;
+            stroke-width: 12
+        }
+
+        button,
+        input,
+        select {
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid #d6dae0;
+            background: #fff;
+            font-size: 14px
+        }
+
+        button.primary {
+            background: var(--accent);
+            color: #fff;
+            border: none
+        }
+        /* --- START: NEW LEGEND STYLES --- */
+    #legend {
+      background: var(--panel);
+      padding: 8px 12px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      margin-bottom: 12px;
+    }
+
+    #legend ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-wrap: wrap; /* Allows wrapping on small screens */
+      gap: 16px;
+    }
+
+    #legend li {
+      display: flex;
+      align-items: center;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .legend-swatch {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      margin-right: 8px;
+      border: 1.5px solid #000;
+    }
+
+    /* Swatch Colors based on your request */
+    #swatch-girls {
+      background-color: #ffefef; /* Pink fill */
+      border-color: #e04ae0; /* Pink stroke */
+    }
+    
+    #swatch-boys {
+      background-color: #e8f6ff; /* Blue fill */
+      border-color: #04139a; /* Blue stroke */
+    }
+
+    #swatch-venue {
+      background-color: #fff6f6; /* Red highlight fill */
+      border-color: #ff6b6b; /* Red highlight stroke */
+    }
+    /* --- END: NEW LEGEND STYLES --- */
+
+        /* -----------------------------------------
+     * Responsive Media Query for Mobile
+     -----------------------------------------*/
+        @media (max-width: 650px) {
+
+            /*
+        THE MOST IMPORTANT FIX:
+        Change SVG height from 85vh to 'auto'.
+        This lets the SVG scale proportionally to fit the 100% width
+        based on its viewBox aspect ratio, preventing horizontal overflow.
+      */
+            svg {
+                height: auto;
+            }
+
+            /* Allow header items to wrap onto a new line on small screens */
+            header {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            /* Remove the auto margin when the controls wrap */
+            #controls {
+                margin-left: 0;
+            }
+
+            /* Reduce padding for a tighter fit on small screens */
+            #app {
+                padding: 8px;
+                gap: 8px;
+            }
+
+            #map-wrap {
+                padding: 8px;
+            }
+
+            /* Optional: Make the back button full-width for easier tapping */
+            #controls button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Floor 1</h1>
+        <div id="controls">
+            <button id="backBtn" title="Go back">Back to Events</button>
+        </div>
+    </header>
+
+    <div id="legend">
+        <ul>
+          <li><span class="legend-swatch" id="swatch-girls"></span> Girls Restroom</li>
+          <li><span class="legend-swatch" id="swatch-boys"></span> Boys Restroom</li>
+          <li><span class="legend-swatch" id="swatch-venue"></span> Event Venue</li>
+        </ul>
+      </div>
+
+
+    <div id="app">
+        <div id="left">
+            <div id="map-wrap" class="panel">
+                <svg id="svg" viewBox="0 0 1000 1200" role="img" aria-label="Floor 1 map">
+                    <defs>
+                        <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+                            <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#000" flood-opacity="0.06" />
+                        </filter>
+                    </defs>
+
+                    <g id="viewport">
+                        <polyline class="corridor-line" points="160,180 840,180 840,820 160,820 160,180" />
+
+                        <rect x="300" y="260" width="400" height="380" fill="#fbfdff" stroke="#eef3fb" />
+                        <text x="500" y="450" font-size="45" text-anchor="middle" fill="#6b6b6b">Floor 1</text>
+
+                        <rect id="LAB1" class="room" x="180" y="80" width="150" height="70" />
+                        <text x="255" y="120" font-size="12" text-anchor="middle">
+                            <tspan x="255" dy="-10">Physics Lab</tspan>
+                            <tspan x="255" dy="12" font-size="9">Circuit Design</tspan>
+                            <tspan x="255" dy="12" font-size="9">Analog Workshop</tspan>
+                        </text>
+
+                        <rect id="LAB2" class="room" x="340" y="80" width="150" height="70" />
+                        <text x="415" y="120" font-size="12" text-anchor="middle">
+                            <tspan x="415" dy="-10">Circuits Lab</tspan>
+                            <tspan x="415" dy="12" font-size="9">PCB Design</tspan>
+                        </text>
+
+                        <rect id="LAB3" class="room" x="500" y="80" width="150" height="70" />
+                        <text x="575" y="120" font-size="12" text-anchor="middle">
+                            <tspan x="575" dy="-10">MPMC Lab</tspan>
+                            <tspan x="575" dy="12" font-size="9">Embedded Systems</tspan>
+                        </text>
+
+                        <rect id="LAB4" class="room" x="660" y="80" width="150" height="70" />
+                        <text x="735" y="120" font-size="12" text-anchor="middle">
+                            <tspan x="735" dy="-10">LIC Lab</tspan>
+                            <tspan x="735" dy="12" font-size="9">IC Design</tspan>
+                        </text>
+
+                        <rect id="stair-NW" x="90" y="80" width="50" height="80" fill="#e8f2ff" stroke="#7aa6ff" />
+                        <text x="115" y="120" font-size="10" text-anchor="middle">Stair</text>
+
+                        <rect class="room" x="90" y="175" width="40" height="40" />
+                        <text x="110" y="195" font-size="11" text-anchor="middle">water</text>
+
+                        <rect id="stair-NE" x="860" y="80" width="50" height="80" fill="#e8f2ff" stroke="#7aa6ff" />
+                        <text x="885" y="120" font-size="10" text-anchor="middle">Stair</text>
+
+                        <rect class="room" x="860" y="200" width="40" height="40" />
+                        <text x="880" y="220" font-size="11" text-anchor="middle">water</text>
+
+                        <rect id="stair-SW" x="-10" y="850" width="50" height="80" fill="#e8f2ff" stroke="#7aa6ff" />
+                        <text x="15" y="890" font-size="10" text-anchor="middle">Stair</text>
+
+                        <rect class="room" x="80" y="775" width="40" height="40" />
+                        <text x="100" y="800" font-size="11" text-anchor="middle">water</text>
+
+                        <rect class="room" x="20" y="775" width="50" height="40" />
+                        <text x="40" y="800" font-size="11" text-anchor="middle">filt</text>
+
+                        <rect id="stair-SE" x="900" y="850" width="50" height="80" fill="#e8f2ff" stroke="#7aa6ff" />
+                        <text x="925" y="890" font-size="10" text-anchor="middle">Stair</text>
+
+                        <rect class="room" x="860" y="765" width="40" height="40" />
+                        <text x="880" y="790" font-size="11" text-anchor="middle">water</text>
+
+                        <rect id="REST_TOP" class="room" x="940" y="100" width="80" height="60"
+                            style="fill:#ffefef;stroke:#04139a" />
+                        <text x="980" y="135" font-size="11" text-anchor="middle">Boys Restroom</text>
+
+                        <rect id="LABC" class="room" x="10" y="220" width="120" height="240" />
+                        <text x="75" y="350" font-size="12" text-anchor="middle">
+                            <tspan x="75" dy="-10">Gamma Lab</tspan>
+                            <tspan x="75" dy="12" font-size="9">AI/ML Workshop</tspan>
+                            <tspan x="75" dy="12" font-size="9">Data Science</tspan>
+                        </text>
+
+                        <rect id="LABB" class="room" x="10" y="470" width="120" height="140" />
+                        <text x="75" y="550" font-size="12" text-anchor="middle">
+                            <tspan x="75" dy="-10">Beta Lab</tspan>
+                            <tspan x="75" dy="12" font-size="9">Web Dev Bootcamp</tspan>
+                        </text>
+
+                        <rect id="LABA" class="room" x="10" y="620" width="120" height="140" />
+                        <text x="75" y="690" font-size="12" text-anchor="middle">
+                            <tspan x="75" dy="-10">Alpha Lab</tspan>
+                            <tspan x="75" dy="12" font-size="9">Cybersecurity</tspan>
+                        </text>
+
+                        <rect id="LH06" class="room" x="860" y="245" width="80" height="90" />
+                        <text x="900" y="300" font-size="11" text-anchor="middle">
+                            <tspan x="900" dy="-10">LH-08</tspan>
+                            <tspan x="900" dy="12" font-size="8">Tech Talk</tspan>
+                        </text>
+
+                        <rect id="LH07" class="room" x="860" y="345" width="80" height="90" />
+                        <text x="900" y="400" font-size="11" text-anchor="middle">
+                            <tspan x="900" dy="-10">LH-09</tspan>
+                            <tspan x="900" dy="12" font-size="8">Project Expo</tspan>
+                        </text>
+
+                        <rect id="LH08" class="room" x="860" y="445" width="80" height="90" />
+                        <text x="900" y="500" font-size="11" text-anchor="middle">
+                            <tspan x="900" dy="-10">LH-10</tspan>
+                            <tspan x="900" dy="12" font-size="8">Startup Pitch</tspan>
+                        </text>
+
+                        <rect id="LH09" class="room" x="860" y="545" width="80" height="90" />
+                        <text x="900" y="600" font-size="11" text-anchor="middle">
+                            <tspan x="900" dy="-10">LH-11</tspan>
+                            <tspan x="900" dy="12" font-size="8"></tspan>
+                        </text>
+
+                        <rect id="LH10" class="room" x="860" y="645" width="80" height="90" />
+                        <text x="900" y="700" font-size="11" text-anchor="middle">
+                            <tspan x="900" dy="-10">LH-12</tspan>
+                            <tspan x="900" dy="12" font-size="8">Coding Contest</tspan>
+                        </text>
+
+                        <rect id="SH1" class="room" x="90" y="840" width="250" height="70" />
+                        <text x="200" y="875" font-size="12" text-anchor="middle">
+                            <tspan x="200" dy="-10">SH-1</tspan>
+                            <tspan x="200" dy="12" font-size="9">Debugging Duel</tspan>
+                            <tspan x="200" dy="12" font-size="9">Algo Arena</tspan>
+                        </text>
+
+                        <rect id="STAFF" class="room" x="360" y="840" width="200" height="70" />
+                        <text x="460" y="875" font-size="12" text-anchor="middle">Staff Room</text>
+
+                        <rect id="LH14" class="room" x="580" y="840" width="150" height="70" />
+                        <text x="655" y="875" font-size="12" text-anchor="middle">
+                            <tspan x="655" dy="-10">LH-14</tspan>
+                            <tspan x="655" dy="12" font-size="9">Paper Presentation</tspan>
+                        </text>
+
+                        <rect id="LH13" class="room" x="750" y="840" width="120" height="70" />
+                        <text x="810" y="875" font-size="12" text-anchor="middle">
+                            <tspan x="810" dy="-10">LH-13</tspan>
+                            <tspan x="810" dy="12" font-size="9">Technical Quiz</tspan>
+                        </text>
+
+                        <polyline id="route" points="" />
+                        <polyline id="routeOverlay" points="" />
+                    </g>
+                </svg>
+            </div>
+            <div>
+                <button id="zoomInBtn" title="Zoom In">+ Zoom in</button>
+                <button id="zoomOutBtn" title="Zoom Out">-Zoom out</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* --------------------------
+         * Node coordinates and graph (corridor ring)
+         * ---------------------------*/
+        const START_pos = { x: 500, y: 920 }; // Original Entrance (south-center) - no longer used as start
+        const nodes = {
+            // Corners
+            NW: { x: 160, y: 180 },
+            NE: { x: 840, y: 180 },
+            SE: { x: 840, y: 820 },
+            SW: { x: 160, y: 820 }, // This is the new START node
+            // Top intermediates
+            N1: { x: 255, y: 180 }, // LAB1
+            N2: { x: 415, y: 180 }, // LAB2
+            N3: { x: 575, y: 180 }, // LAB3
+            N4: { x: 735, y: 180 }, // LAB4
+            // Right intermediates
+            E1: { x: 840, y: 290 }, // LH06
+            E2: { x: 840, y: 390 }, // LH07
+            E3: { x: 840, y: 490 }, // LH08
+            E4: { x: 840, y: 590 }, // LH09
+            E5: { x: 840, y: 690 }, // LH10
+            // Bottom intermediates (right to left)
+            B1: { x: 810, y: 820 }, // LH13
+            B2: { x: 655, y: 820 }, // LH14
+            B3: { x: 500, y: 820 }, // STAFF
+            B4: { x: 215, y: 820 }, // SH1
+            // Left intermediates (bottom to top)
+            L1: { x: 160, y: 690 }, // LABA
+            L2: { x: 160, y: 540 }, // LABB
+            L3: { x: 160, y: 340 }  // LABC
+        };
+
+        /* adjacency (clockwise ring) */
+        const graph = {
+            B3: ['B4', 'B2'],
+            B4: ['B3', 'SW'],
+            SW: ['B4', 'L1'], // SW is the new start point
+            L1: ['SW', 'L2'],
+            L2: ['L1', 'L3'],
+            L3: ['L2', 'NW'],
+            NW: ['L3', 'N1'],
+            N1: ['NW', 'N2'],
+            N2: ['N1', 'N3'],
+            N3: ['N2', 'N4'],
+            N4: ['N3', 'NE'],
+            NE: ['N4', 'E1'],
+            E1: ['NE', 'E2'],
+            E2: ['E1', 'E3'],
+            E3: ['E2', 'E4'],
+            E4: ['E3', 'E5'],
+            E5: ['E4', 'SE'],
+            SE: ['E5', 'B1'],
+            B1: ['SE', 'B2'],
+            B2: ['B1', 'B3']
+        };
+        graph['B3'].push('START_pos');
+        graph['START_pos'] = ['B3'];
+
+
+        /* POI -> nearest node mapping */
+        const POI_NODE = {
+            'LAB1': 'N1', 'LAB2': 'N2', 'LAB3': 'N3', 'LAB4': 'N4', 'REST_TOP': 'NE',
+            'LABC': 'L3', 'LABB': 'L2', 'LABA': 'L1',
+            'LH06': 'E1', 'LH07': 'E2', 'LH08': 'E3', 'LH09': 'E4', 'LH10': 'E5',
+            'SH1': 'B4', 'STAFF': 'B3', 'LH14': 'B2', 'LH13': 'B1'
+        };
+
+        /* FIXED: Map venue names from events.html to local SVG IDs */
+        const venueMap = {
+            'ALPHA LAB': 'LABA',
+            'BETA LAB': 'LABB',
+            'LH13': 'LH13',
+            'LH08': 'LH06', // ECE "LH08" -> ID "LH06"
+            'LH09': 'LH07', // ECE "LH09" -> ID "LH07"
+            'LIC LAB': 'LAB4',
+            'MPMC LAB': 'LAB3',
+            'LH10': 'LH08', // ECE "LH10" -> ID "LH08"
+            'CIRCUITS LAB': 'LAB2',
+            'LH 12': 'LH10' // AI&DS "LH 12" -> ID "LH10"
+        };
+
+        /* DOM */
+        const svg = document.getElementById('svg');
+        const viewport = document.getElementById('viewport');
+        const route = document.getElementById('route');
+        const routeOverlay = document.getElementById('routeOverlay');
+
+        const zoomInBtn = document.getElementById('zoomInBtn');
+        const zoomOutBtn = document.getElementById('zoomOutBtn');
+        // const searchBtn = document.getElementById('searchBtn'); // CRASH FIX: Commented out
+        // const searchBox = document.getElementById('searchBox'); // CRASH FIX: Commented out
+        // const rotLeft = document.getElementById('rotLeft'); // CRASH FIX: Commented out
+        // const rotRight = document.getElementById('rotRight'); // CRASH FIX: Commented out
+        // const resetView = document.getElementById('resetView'); // CRASH FIX: Commented out
+        const backBtn = document.getElementById('backBtn'); // Back button
+
+        // --- START: RE-ENABLED ZOOM/PAN CODE ---
+        let state = { tx: 0, ty: 0, scale: 1, dragging: false, lastX: 0, lastY: 0 };
+        function applyTransform() {
+            viewport.setAttribute('transform', `translate(${state.tx} ${state.ty}) scale(${state.scale})`);
+        }
+        state.tx = 40; state.ty = 10; state.scale = 1; applyTransform();
+
+        function zoom(delta) {
+            state.scale = Math.min(3, Math.max(0.4, state.scale * delta));
+            applyTransform();
+        }
+
+        /* pan/zoom handlers */
+        svg.addEventListener('pointerdown', (e) => {
+            svg.setPointerCapture(e.pointerId);
+            state.dragging = true;
+            state.lastX = e.clientX;
+            state.lastY = e.clientY;
+            svg.style.cursor = 'grabbing';
+        });
+        svg.addEventListener('pointermove', (e) => {
+            if (!state.dragging) return;
+            const dx = e.clientX - state.lastX, dy = e.clientY - state.lastY;
+            state.lastX = e.clientX; state.lastY = e.clientY;
+            state.tx += dx;
+            state.ty += dy;
+            applyTransform();
+        });
+        svg.addEventListener('pointerup', (e) => {
+            state.dragging = false;
+            try { svg.releasePointerCapture(e.pointerId); } catch (e) { }
+            svg.style.cursor = 'grab';
+        });
+        svg.addEventListener('pointerleave', () => {
+            state.dragging = false;
+            svg.style.cursor = 'grab';
+        });
+        svg.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            // Simplified to only do zooming
+            const delta = -e.deltaY * 0.0015;
+            state.scale = Math.min(3, Math.max(0.4, state.scale * (1 + delta)));
+            applyTransform();
+        }, { passive: false });
+
+        zoomInBtn.addEventListener('click', () => zoom(1.2));
+        zoomOutBtn.addEventListener('click', () => zoom(1 / 1.2));
+
+        // Button listeners remain commented out
+        // rotLeft.addEventListener('click', () => { state.rotate -= 15; applyTransform(); });
+        // rotRight.addEventListener('click', () => { state.rotate += 15; applyTransform(); });
+        // resetView.addEventListener('click', () => { state.tx = 40; state.ty = 10; state.scale = 1; state.rotate = 0; applyTransform(); });
+        // --- END: RE-ENABLED ZOOM/PAN CODE ---
+
+
+        // Back button listener
+        backBtn.addEventListener('click', () => {
+            window.location.href = 'index.html';
+        });
+
+        /* routing */
+        function findPath(start, end) {
+            if (start === end) return [start];
+            const q = [start], prev = { [start]: null };
+            while (q.length) {
+                const cur = q.shift();
+                for (const nb of (graph[cur] || [])) {
+                    if (prev[nb] !== undefined) continue;
+                    prev[nb] = cur; q.push(nb);
+                    if (nb === end) {
+                        const out = [nb]; let p = cur; while (p !== null) { out.unshift(p); p = prev[p]; } return out;
+                    }
+                }
+            }
+            return null;
+        }
+        function nodePos(k) { if (k === 'START_pos') return START_pos; return nodes[k]; }
+        function pathToPoints(seq) { return seq.map(k => { const p = nodePos(k); return `${p.x} ${p.y}`; }).join(' '); }
+
+        /**
+         * Draws a path from the start to the destination.
+         * @param {string} destKey The ID of the destination (e.g., "LABA", "LH13")
+         * @param {boolean} drawLine Whether to draw the red path line
+         */
+        function setRouteTo(destKey, drawLine = false) {
+            // 1. Clear previous highlights/routes
+            route.setAttribute('points', '');
+            document.querySelectorAll('.room.highlight').forEach(el => el.classList.remove('highlight'));
+
+            // 2. Find destination node
+            if (!POI_NODE[destKey]) {
+                console.warn('Unknown destination key:', destKey);
+                return false;
+            }
+            const nodeKey = POI_NODE[destKey];
+
+            // 3. Determine start node (Hardcoded for Floor 1)
+            const startNode = 'SW'; // Bottom-left corner node (as requested)
+
+            // 4. Find path
+            const seq = findPath(startNode, nodeKey);
+            if (!seq) {
+                console.warn('No path found from', startNode, 'to', nodeKey);
+                return false;
+            }
+
+            // 5. Draw path (MODIFICATION: Only if drawLine is true)
+            if (drawLine) {
+                const pts = pathToPoints(seq);
+                route.setAttribute('points', pts);
+                routeOverlay.setAttribute('points', pts);
+            }
+
+            // 6. Highlight destination
+            const destEl = document.getElementById(destKey);
+            if (destEl) {
+                destEl.classList.add('highlight');
+            }
+            return true;
+        }
+
+        /* clickable rooms */
+        document.querySelectorAll('.room').forEach(el => {
+            el.addEventListener('click', () => {
+                const id = el.id;
+                if (POI_NODE[id]) {
+                    // MODIFICATION: Clicking a room only highlights it (no path)
+                    setRouteTo(id, false);
+                }
+            });
+        });
+
+        /**
+         * Initializes the map on page load by reading the URL.
+         */
+        function initializeMap() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const venue = urlParams.get('venue');
+            // MODIFICATION: Check for drawPath parameter
+            const drawPath = urlParams.get('drawPath');
+            if (!venue) return;
+
+            let destKey = venue.trim().toUpperCase();
+
+            if (venueMap[destKey]) {
+                destKey = venueMap[destKey];
+            }
+
+            if (POI_NODE[destKey]) {
+                // MODIFICATION: Pass drawPath flag to setRouteTo
+                setRouteTo(destKey, drawPath === 'true');
+            } else {
+                console.warn('Could not find POI for venue:', venue);
+            }
+        }
+
+        /* initial call on page load */
+        initializeMap();
+    </script>
+</body>
+
+</html>
